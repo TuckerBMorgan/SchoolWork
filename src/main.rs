@@ -115,13 +115,13 @@ pub fn calc_dist_sqr(a: &Vec2, b: &Vec2) -> f32{
 
 
 //the best tile is the tile that has the lowest score of g + h, that would mean it has the lowest cost with it
-pub fn find_best_next_tile(possible_tile: &Vec<Tile>)  -> usize {
+pub fn find_best_next_tile(possible_tile: &Vec<Vec2>, map_as_colors: &Vec<Vec<Tile>>)  -> usize {
     
     let mut index = 0;
-    let mut current_score = possible_tile[index].g + possible_tile[index].h;//calculating F
+    let mut current_score = map_as_colors[possible_tile[index].x][possible_tile[index].y].g +map_as_colors[possible_tile[index].x][possible_tile[index].y].h;//calculating F
 
     for i in 0..possible_tile.len() {
-        let this_score = possible_tile[i].g + possible_tile[i].h;
+        let this_score =  map_as_colors[possible_tile[i].x][possible_tile[i].y].g + map_as_colors[possible_tile[i].x][possible_tile[i].y].h;
         if this_score < current_score {
             index = i;
             current_score = this_score;
@@ -230,33 +230,34 @@ pub fn find_path_with_a_star(map_as_colors: &mut Vec<Vec<Tile>>, start_pos: Vec2
     //set our huerestic
     set_h_for_all_tiles(map_as_colors, &end_pos);
 
-    let mut possible_tiles = vec![];
+    let mut possible_tiles: Vec<Vec2> = vec![];
     let mut seen_set : HashSet<Vec2> = HashSet::new();
     let mut prev: Vec2 = Vec2{x: start_pos.x, y: start_pos.y};
 
-    possible_tiles.push(map_as_colors[start_pos.x][start_pos.y]);
+    possible_tiles.push(map_as_colors[start_pos.x][start_pos.y].pos);
     seen_set.insert(start_pos);
+    let mut out_quit = 0;
 
     while possible_tiles.len() != 0 {
-        
+
         //get the best looking tile in the tiles we have not looked at yet
-        let next_index = find_best_next_tile(&possible_tiles);
+        let next_index = find_best_next_tile(&possible_tiles, &map_as_colors);
 
-        println!("before {}", possible_tiles.len());
         //we do a look up by the index that find_best_next_tile returns
-        let mut current = possible_tiles.remove(next_index);
-        println!("afterc {}", possible_tiles.len());
+        let current = possible_tiles.remove(next_index);
 
-        if current.pos == end_pos {
+        if current == end_pos {
             return create_final_path(start_pos, end_pos, map_as_colors);
         }
+
+        println!("{:?}", current);
         //set prev so we know what tile we came from
-        current.prev = prev;
+        map_as_colors[current.x][current.y].prev = prev;
         //g is our walk cost plus the cost it took to get here
-        current.g = current.ground_type.walk_cost() as f32 + map_as_colors[prev.x][prev.y].g;
+        map_as_colors[current.x][current.y].g  = map_as_colors[current.x][current.y].ground_type.walk_cost() as f32 + map_as_colors[prev.x][prev.y].g;
 
         //we can prev to be set to use current now that we are done with the book keeping
-        prev = current.pos;
+        prev =  map_as_colors[current.x][current.y].pos;
         //set 
 
         //get those indexs that we can look up, that is greater then zero, less then the grid size
@@ -264,23 +265,14 @@ pub fn find_path_with_a_star(map_as_colors: &mut Vec<Vec<Tile>>, start_pos: Vec2
         
         //add to the possible tiles those tiles that we have not seen yet
         let add_list : Vec<Vec2> = possibles.into_iter().filter(|element|{
-            /*
-            println!("|||");
-            println!("{:?}", element);
-            println!("{:?}", seen_set.contains(element));
-            println!("---");
-            */
             return !seen_set.contains(element);
         }).collect();
 
         for pos in add_list {
-            
-            println!("pos {:?}", pos);
-            let element = map_as_colors[pos.x][pos.y];
-            println!("element added {:?}", element);
-            possible_tiles.push(map_as_colors[pos.x][pos.y]);
+            possible_tiles.push(pos);
             seen_set.insert(pos);
         }
+        out_quit = out_quit + 1;
     }
 
     println!("{:?}", seen_set);
@@ -325,11 +317,14 @@ fn main() {
         let terrian_type = rgba_to_enum.get(&p);
         match terrian_type {
             Some(tt) => {
+
                 //fill the tiles with the data we need
                 let mut tile = map_as_colors[count % X_SIZE][count / X_SIZE];
                 tile.pos.x = count & X_SIZE;
                 tile.pos.y = count / X_SIZE;
                 tile.ground_type = tt.clone();
+
+                 map_as_colors[count % X_SIZE][count / X_SIZE] = tile;
             }, 
             None => {}
         };
